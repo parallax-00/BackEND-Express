@@ -1,3 +1,4 @@
+//! Mainly used for establishing database connection
 import mongoose from "mongoose";
 import { DB_NAME } from "../constants.js";
 
