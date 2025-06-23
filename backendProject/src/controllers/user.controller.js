@@ -1,0 +1,169 @@
+import { ApiErrors } from "../utils/apiError.js";
+import { asyncHandler } from "../utils/asyncHandlers.js";
+import { User } from "../models/user.model.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { ApiResponse } from "../utils/apiResponse.js";
+
+//* A seperate method to generate Access and Refresh Tokens ->
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { refreshToken, accessToken };
+  } catch (error) {
+    throw new ApiErrors(
+      500,
+      "Something went wrong while generating the Refresh and Access Tokens"
+    );
+  }
+};
+
+const registerUser = asyncHandler(async (req, res) => {
+  //? Get user detail from frontend
+  //? Validation - not empty
+  //? Check if user already exists: username, email
+  //? Check for images, check for avatar. If available then upload them to Cloudinary, avatar (required param) check.
+  //? Create user Object - create entry in db (Creates user)
+  //? Remove password and refresh token field from response
+  //? Check whether the user was created successfully or not
+  //? Return result
+
+  const { fullName, username, email, password } = req.body; //.. .body is coming from expressJS
+  //* Validation can be done per parameter using the if statements -
+  // if (fullName === "") {
+  //   throw new ApiErrors(400, "Full name is required");
+  // }
+  // if (username === "") {
+  //   throw new ApiErrors(400, "username is required");
+  // }
+  // if (email === "") {
+  //   throw new ApiErrors(400, "email is required");
+  // }
+  // if (password === "") {
+  //   throw new ApiErrors(400, "password is required");
+  // }
+
+  //* Another approach for Validation -
+  if ([fullName, email, password, username].some((e) => e?.trim() === "")) {
+    throw new ApiErrors(400, "All fields are required. ");
+  }
+  //* Checking if user already exists -
+  const existedUser = await User.findOne({ $or: [{ username }, { email }] });
+  if (existedUser) {
+    throw new ApiErrors(409, "User already Exists.");
+  }
+  //* Files and avatar -.... .files is coming from multer
+  //? req.files is an array with objects being Avatar and CoverImage and their properties in key value pairs respectively in each object
+  const avatarLocalPath = req.files?.avatar[0]?.path;
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
+
+  if (!avatarLocalPath) {
+    throw new ApiErrors(400, "Avatar file is required");
+  }
+  //*uploading them to Cloudinary
+
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatar) {
+    throw new ApiErrors(400, "Avatar is Required");
+  }
+  //*Create User Object and make it an entrant to database
+  const user = await User.create({
+    fullName,
+    avatar: avatar.url,
+    coverImage: coverImage?.url || "",
+    email,
+    password,
+    username: username.toLowerCase(),
+  });
+  //*Checking whether the user was created successfully or not -
+  const createdUserId = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+  if (!createdUserId) {
+    throw new ApiErrors(500, "Something went wrong while registering the user");
+  }
+  return res //! Final step of returing the USER
+    .status(201)
+    .json(new ApiResponse(200, createdUserId, "User Registered Successfully"));
+});
+
+const loginUser = asyncHandler(async (req, res) => {
+  //? to login a user get info from req.body -> username, password, email
+  //? find the user
+  //? if found check password
+  //? if checked and matches then generate both refresh and access tokens
+  //? send tokens to user using cookies, dont send password to user
+  //? Complete Login
+
+  //* Getting Data from req.body
+  const { username, password, email } = req.body;
+
+  if (!username || !email) {
+    throw new ApiErrors(400, "Either email or username is required to login");
+  }
+
+  //*Finding the user which will be in database if signedup
+  const user = await User.findOne({
+    $or: [{ username }, { email }],
+  });
+  if (!user) {
+    throw new ApiErrors(404, "User not found");
+  }
+
+  //* Check for password
+  const passwordCheck = await user.isPasswordCorrect(password);
+  if (!passwordCheck) {
+    throw new ApiErrors(400, "Password is invalid");
+  }
+
+  //* Generate the Tokens
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id
+  );
+
+  //* Send the generated Tokens as cookies and send response as User logged in Successfully
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        {
+          message: "User Logged in Successfully ",
+        }
+      )
+    );
+});
+
+const logoutUser = asyncHandler(async (req, res) => {
+  //? To logout a user just clear the cookies and reset the refreshToken
+  //? 
+});
+export { registerUser, loginUser, logoutUser };

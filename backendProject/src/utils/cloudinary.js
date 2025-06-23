@@ -20,7 +20,8 @@ const uploadOnCloudinary = async (localFilePath) => {
       resource_type: "auto",
     });
     //* Removing the file from local server
-    console.log("File is uploaded on Cloudinary ", uploadResult.url);
+    // console.log("File is uploaded on Cloudinary ", uploadResult.url);
+    fs.unlinkSync(localFilePath);
     return uploadResult;
   } catch (error) {
     //* !localFilePath -> return null ---- if true then we are sure that file is on the local server then process is handled in try {} if it fails, then catch{} *File is on local server but cant be uploaded on Cloudinary* thus for safe keeping the server and security reasons unlink the file from the server.
@@ -28,3 +29,4 @@ const uploadOnCloudinary = async (localFilePath) => {
     return null;
   }
 };
+export { uploadOnCloudinary };
