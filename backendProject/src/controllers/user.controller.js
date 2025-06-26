@@ -239,6 +239,125 @@ const logoutUser = asyncHandler(async (req, res) => {
     );
 });
 
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  //?Get the user, already loggedIn(can be verified by the middleware of verifyJWT) going to change its password
+  //?Take user's oldPassword match it with the password stored in DB for extra security
+  //?Take in new password (optional -> make an input for the confirmPassword)
+  //?Set the newPassword by updating the DB
+  //*Fields extracted from the body
+  const { oldPassword, newPassword } = req.body;
 
+  //*Finding the User
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiErrors(401, "Access not authorized");
+  }
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+  //*Matching the Password with already made method isPasswordCorrect in the user.model.js
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  if (!isPasswordCorrect) {
+    throw new ApiErrors(400, "Invalid Password");
+  }
+
+  //*Matches then take in newPassword and set it as new password in the user object
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  //*Sending the response and notifying the user
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password Changed Successfully"));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  //*To get the current user we know it has to be logged in, if its logged in then we are sure it went through the middelware auth.middleware.js which then returns us the verified (logged in) user object.
+  return res
+    .status(200)
+    .json(200, req.user, "Current User fetched Successfully");
+});
+
+const updateUserDetails = asyncHandler(async (req, res) => {
+  //?Fields which we want to give functionlaity of updating
+  const { fullName, email } = req.body;
+  if (!fullName || !email) {
+    throw new ApiErrors(400, "All fields are required");
+  }
+  //*Fetching the user and setting up the new details
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      //?Using mongoDB operator setting in the fields
+      $set: {
+        fullName: fullName,
+        email: email,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Details are updated successfully"));
+});
+
+//?Can be updated only by the logged in user
+//?Multer middleware will be used for accessibility to flies handling -> While writing the routes.
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new ApiErrors(400, "Avatar file is missing");
+  }
+  //*Uploads on Cloudinary
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatar.url) {
+    throw new ApiErrors(400, "Error while uploading avatar");
+  }
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: { avatar: avatar.url },
+    },
+    { new: true }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar Uploaded Successfully"));
+});
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const CoverImageLocalPath = req.file?.path;
+  if (!CoverImageLocalPath) {
+    throw new ApiErrors(400, "CoverImage file is missing");
+  }
+  //*Uploads on Cloudinary
+  const CoverImage = await uploadOnCloudinary(CoverImageLocalPath);
+  if (!CoverImage.url) {
+    throw new ApiErrors(400, "Error while uploading avatar");
+  }
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: { CoverImage: CoverImage.url },
+    },
+    { new: true }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "CoverImage Uploaded Successfully"));
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateUserDetails,
+  updateUserAvatar,
+  updateUserCoverImage,
+};
