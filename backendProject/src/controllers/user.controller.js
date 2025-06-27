@@ -273,7 +273,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
   //*To get the current user we know it has to be logged in, if its logged in then we are sure it went through the middelware auth.middleware.js which then returns us the verified (logged in) user object.
   return res
     .status(200)
-    .json(200, req.user, "Current User fetched Successfully");
+    .json(new ApiResponse(200, req.user, "Current User fetched Successfully"));
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
@@ -304,6 +304,7 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 
 //?Can be updated only by the logged in user
 //?Multer middleware will be used for accessibility to flies handling -> While writing the routes.
+//! Add a functionality of deleting old Avatar image and CoverImage if uploaded new one.
 const updateUserAvatar = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.file?.path;
   if (!avatarLocalPath) {
@@ -349,6 +350,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, user, "CoverImage Uploaded Successfully"));
 });
+
+//! 
+const getUserChannelProfile = asyncHandler(async (req, res) => {});
 
 export {
   registerUser,
