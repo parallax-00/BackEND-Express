@@ -351,8 +351,74 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "CoverImage Uploaded Successfully"));
 });
 
-//! 
-const getUserChannelProfile = asyncHandler(async (req, res) => {});
+//! Getting the Channel
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiErrors(400, "No username found");
+  }
+  //* Implementing Aggregation Pipeline ->
+  const channel = await User.aggregate([
+    {
+      //* First pipeline to match
+      $match: { username: username?.toLowerCase() },
+    },
+    {
+      //* Lookup pipeline to perform left outer join, uses Schema Subscription -> MongoDB(subscriptions)
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      //* Adds fields to the Document fo the Subscibers to the 'channel' and the Channels 'channel' subscribedTo
+      $addFields: {
+        subscribersCount: { $size: "$subsribers" },
+        SubscribedToCount: { $size: "$subscribedTo" },
+        isSubscribed: {
+          //* Sends the flag by performing the query 'if', to check whether the Channel is subscribed already or not to implement the 'Subscribe' <-> 'Subscribed' functionality
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      //*Project Pipeline is used to selectively pass the field value to be shown by putting in '1' to show and '0' to not
+      $project: {
+        fullName: 1,
+        username: 1,
+        subscribersCount: 1,
+        SubscribedToCount: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  if (!channel) {
+    throw new ApiErrors(404, "Channel not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully")
+    );
+});
 
 export {
   registerUser,
@@ -364,4 +430,5 @@ export {
   updateUserDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  getUserChannelProfile,
 };
