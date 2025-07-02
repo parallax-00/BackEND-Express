@@ -1,7 +1,7 @@
-import asyncHandler from "../utils/asyncHandlers.js";
-import ApiErrors from "../utils/apiError.js";
+import {asyncHandler} from "../utils/asyncHandlers.js";
+import { ApiErrors } from "../utils/apiError.js";
 import jwt from "jsonwebtoken";
-import User from "../models/user.model.js";
+import {User} from "../models/user.model.js";
 
 export const verifyJWT = asyncHandler(async (req, _, next) => {
   //* Getting the access Token given to user to initiate logout

@@ -147,7 +147,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiErrors(500, "Something went wrong while registering the user");
   }
   return res //! Final step of returing the USER
-    .status(201)
+    .status(200)
     .json(new ApiResponse(200, createdUserId, "User Registered Successfully"));
 });
 
@@ -463,7 +463,15 @@ const getWatchHistory = asyncHandler(async (req, res) => {
       },
     },
   ]);
-  return res.status(200).json(new ApiResponse(200, user[0].watchHistory,"Watch History fetched successfuly"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch History fetched successfuly"
+      )
+    );
 });
 
 export {
